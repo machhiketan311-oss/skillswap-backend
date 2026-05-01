@@ -11,7 +11,9 @@ const app = express();
 // ✅ Middleware
 app.use(cors()); // 
 app.use(express.json());
-
+app.get("/", (req, res) => {
+  res.send("SkillSwap Backend Running 🚀");
+});
 // ✅ Routes
 app.use("/api/auth", authRoutes);
 
