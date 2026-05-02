@@ -92,10 +92,14 @@ router.post("/add-skills", async (req, res) => {
   }
 });
 
-// ================= MATCH USERS =================
+// ================= MATCH USERS (PREMIUM LOCK) =================
 router.get("/match/:userId", async (req, res) => {
   try {
     const user = await User.findById(req.params.userId);
+
+    if (!user.isPremium) {
+      return res.status(403).json({ error: "Upgrade to Premium" });
+    }
 
     const matches = await User.find({
       skillsOffered: { $in: user.skillsWanted }
@@ -146,6 +150,21 @@ router.get("/chat/:user1/:user2", async (req, res) => {
 
   } catch (err) {
     console.log(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ================= ACTIVATE PREMIUM =================
+router.post("/premium/:userId", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId);
+
+    user.isPremium = true;
+    await user.save();
+
+    res.json({ message: "Premium activated 🚀" });
+
+  } catch (err) {
     res.status(500).json({ error: "Server error" });
   }
 });
