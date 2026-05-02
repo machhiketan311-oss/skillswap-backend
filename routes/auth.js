@@ -30,13 +30,9 @@ router.post("/register", async (req, res) => {
 
     await newUser.save();
 
-    res.status(201).json({
-      message: "User registered successfully",
-      user: newUser
-    });
+    res.status(201).json({ message: "Registered", user: newUser });
 
   } catch (err) {
-    console.log(err);
     res.status(500).json({ error: "Server error" });
   }
 });
@@ -47,126 +43,85 @@ router.post("/login", async (req, res) => {
     const { email, password } = req.body;
 
     const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(400).json({ error: "Invalid email" });
-    }
+    if (!user) return res.status(400).json({ error: "Invalid email" });
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({ error: "Invalid password" });
-    }
+    const match = await bcrypt.compare(password, user.password);
+    if (!match) return res.status(400).json({ error: "Invalid password" });
 
-    const token = jwt.sign({ id: user._id }, "secret123", {
-      expiresIn: "1d"
-    });
+    const token = jwt.sign({ id: user._id }, "secret123");
 
-    res.json({
-      message: "Login success",
-      token,
-      user
-    });
+    res.json({ token, user });
 
-  } catch (err) {
-    console.log(err);
+  } catch {
     res.status(500).json({ error: "Server error" });
   }
 });
 
 // ================= ADD SKILLS =================
 router.post("/add-skills", async (req, res) => {
-  try {
-    const { userId, skillsOffered, skillsWanted } = req.body;
+  const { userId, skillsOffered, skillsWanted } = req.body;
 
-    const user = await User.findById(userId);
+  const user = await User.findById(userId);
+  user.skillsOffered = skillsOffered;
+  user.skillsWanted = skillsWanted;
 
-    user.skillsOffered = skillsOffered;
-    user.skillsWanted = skillsWanted;
+  await user.save();
 
-    await user.save();
-
-    res.json({ message: "Skills added" });
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "Server error" });
-  }
+  res.json({ message: "Saved" });
 });
 
-// ================= MATCH USERS (PREMIUM LOCK) =================
+// ================= MATCH (LOCKED) =================
 router.get("/match/:userId", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
+  const user = await User.findById(req.params.userId);
 
-    if (!user.isPremium) {
-      return res.status(403).json({ error: "Upgrade to Premium" });
-    }
-
-    const matches = await User.find({
-      skillsOffered: { $in: user.skillsWanted }
-    });
-
-    res.json(matches);
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "Server error" });
+  if (!user.isPremium) {
+    return res.status(403).json({ error: "Buy Premium First" });
   }
+
+  const matches = await User.find({
+    skillsOffered: { $in: user.skillsWanted }
+  });
+
+  res.json(matches);
 });
 
-// ================= SEND MESSAGE =================
+// ================= PAYMENT LINK =================
+router.get("/pay", (req, res) => {
+  const upi = "upi://pay?pa=ketan@upi&pn=SkillSwap&am=49&cu=INR";
+  res.json({ upi });
+});
+
+// ================= VERIFY PAYMENT =================
+router.post("/verify/:userId", async (req, res) => {
+  const user = await User.findById(req.params.userId);
+
+  user.isPremium = true;
+  await user.save();
+
+  res.json({ message: "Premium Activated" });
+});
+
+// ================= CHAT =================
 router.post("/send-message", async (req, res) => {
-  try {
-    const { sender, receiver, message } = req.body;
+  const { sender, receiver, message } = req.body;
 
-    const newMessage = new Message({
-      sender,
-      receiver,
-      message
-    });
+  const msg = new Message({ sender, receiver, message });
+  await msg.save();
 
-    await newMessage.save();
-
-    res.json({ message: "Message sent" });
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "Server error" });
-  }
+  res.json({ message: "Sent" });
 });
 
-// ================= GET CHAT =================
-router.get("/chat/:user1/:user2", async (req, res) => {
-  try {
-    const { user1, user2 } = req.params;
+router.get("/chat/:u1/:u2", async (req, res) => {
+  const { u1, u2 } = req.params;
 
-    const messages = await Message.find({
-      $or: [
-        { sender: user1, receiver: user2 },
-        { sender: user2, receiver: user1 }
-      ]
-    }).sort({ createdAt: 1 });
+  const msgs = await Message.find({
+    $or: [
+      { sender: u1, receiver: u2 },
+      { sender: u2, receiver: u1 }
+    ]
+  }).sort({ createdAt: 1 });
 
-    res.json(messages);
-
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: "Server error" });
-  }
-});
-
-// ================= ACTIVATE PREMIUM =================
-router.post("/premium/:userId", async (req, res) => {
-  try {
-    const user = await User.findById(req.params.userId);
-
-    user.isPremium = true;
-    await user.save();
-
-    res.json({ message: "Premium activated 🚀" });
-
-  } catch (err) {
-    res.status(500).json({ error: "Server error" });
-  }
+  res.json(msgs);
 });
 
 module.exports = router;
