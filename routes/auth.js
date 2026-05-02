@@ -2,28 +2,26 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+
 const User = require("../models/User");
+const Message = require("../models/Message");
 
 // ================= REGISTER =================
 router.post("/register", async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
-    // Check empty fields
     if (!name || !email || !password) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    // Check existing user
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ error: "User already exists" });
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
     const newUser = new User({
       name,
       email,
@@ -34,11 +32,7 @@ router.post("/register", async (req, res) => {
 
     res.status(201).json({
       message: "User registered successfully",
-      user: {
-        id: newUser._id,
-        name: newUser.name,
-        email: newUser.email
-      }
+      user: newUser
     });
 
   } catch (err) {
@@ -52,19 +46,16 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Check user
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({ error: "Invalid email" });
     }
 
-    // Check password
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ error: "Invalid password" });
     }
 
-    // Token
     const token = jwt.sign({ id: user._id }, "secret123", {
       expiresIn: "1d"
     });
@@ -72,11 +63,7 @@ router.post("/login", async (req, res) => {
     res.json({
       message: "Login success",
       token,
-      user: {
-        _id: user._id,
-        name: user.name,
-        email: user.email
-      }
+      user
     });
 
   } catch (err) {
@@ -115,6 +102,47 @@ router.get("/match/:userId", async (req, res) => {
     });
 
     res.json(matches);
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ================= SEND MESSAGE =================
+router.post("/send-message", async (req, res) => {
+  try {
+    const { sender, receiver, message } = req.body;
+
+    const newMessage = new Message({
+      sender,
+      receiver,
+      message
+    });
+
+    await newMessage.save();
+
+    res.json({ message: "Message sent" });
+
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
+// ================= GET CHAT =================
+router.get("/chat/:user1/:user2", async (req, res) => {
+  try {
+    const { user1, user2 } = req.params;
+
+    const messages = await Message.find({
+      $or: [
+        { sender: user1, receiver: user2 },
+        { sender: user2, receiver: user1 }
+      ]
+    }).sort({ createdAt: 1 });
+
+    res.json(messages);
 
   } catch (err) {
     console.log(err);
