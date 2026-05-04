@@ -4,30 +4,28 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
-const authRoutes = require("./routes/auth");
-
 const app = express();
 
-// ✅ Middleware
-app.use(cors()); // 
+// ✅ Middlewares
+app.use(cors());
 app.use(express.json());
+
+// ✅ Routes
+app.use("/api/auth", require("./routes/auth"));
+
+// ✅ Home route (test)
 app.get("/", (req, res) => {
   res.send("SkillSwap Backend Running 🚀");
 });
-// ✅ Routes
-app.use("/api/auth", authRoutes);
 
-// ✅ Home route
-app.get("/", (req, res) => {
-    res.send("SkillSwap Backend Running 🚀");
-});
+// ✅ MongoDB Connect
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB Connected"))
+  .catch(err => console.log(err));
 
-// ✅ MongoDB Atlas Connection
-mongoose.connect("mongodb+srv://MachhiKetan:ketan6102@cluster0.7jf6xx9.mongodb.net/skillswap")
-.then(() => console.log("MongoDB Connected"))
-.catch(err => console.log(err));
+// ✅ Server Start
+const PORT = process.env.PORT || 5000;
 
-// ✅ Server start
-app.listen(5000, () => {
-    console.log("Server started on port 5000");
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });
